@@ -9,6 +9,17 @@
   function showError(msg) { errorEl.textContent = msg; }
   function clearError()    { errorEl.textContent = ''; }
 
+  // ── Password visibility toggles ────────────────────────────────────────────
+  document.querySelectorAll('.pw-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = btn.closest('.password-wrap').querySelector('input');
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      btn.style.opacity = showing ? '0.6' : '1';
+      btn.classList.toggle('pw-closed', showing);
+    });
+  });
+
   // ── Tab switching ──────────────────────────────────────────────────────────
   document.querySelectorAll('.tab').forEach(btn => {
     btn.addEventListener('click', () => {

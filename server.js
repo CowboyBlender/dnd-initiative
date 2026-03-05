@@ -56,7 +56,10 @@ async function initDb() {
       show_name BOOLEAN DEFAULT TRUE,
       show_hp BOOLEAN DEFAULT FALSE,
       show_conditions BOOLEAN DEFAULT TRUE,
-      is_visible BOOLEAN DEFAULT TRUE
+      is_visible BOOLEAN DEFAULT TRUE,
+      death_save_fails INTEGER DEFAULT 0,
+      death_save_successes INTEGER DEFAULT 0,
+      show_death_saves BOOLEAN DEFAULT TRUE
     );
 
     CREATE TABLE IF NOT EXISTS combatant_conditions (
@@ -67,6 +70,11 @@ async function initDb() {
       rounds_remaining INTEGER DEFAULT NULL
     );
   `);
+
+  // Migrations for existing DBs (ADD COLUMN IF NOT EXISTS is idempotent in PostgreSQL)
+  await pool.query('ALTER TABLE combatants ADD COLUMN IF NOT EXISTS death_save_fails INTEGER DEFAULT 0');
+  await pool.query('ALTER TABLE combatants ADD COLUMN IF NOT EXISTS death_save_successes INTEGER DEFAULT 0');
+  await pool.query('ALTER TABLE combatants ADD COLUMN IF NOT EXISTS show_death_saves BOOLEAN DEFAULT TRUE');
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -94,6 +102,7 @@ async function buildRoomState(room, role) {
   }
 
   let visible = combatants;
+  let returnTurnIndex = room.current_turn_index;
   if (role === 'player') {
     visible = combatants
       .filter(c => c.is_visible)
@@ -114,14 +123,42 @@ async function buildRoomState(room, role) {
         current_hp: c.show_hp ? c.current_hp : null,
         temp_hp:    c.show_hp ? c.temp_hp    : null,
         conditions: c.show_conditions ? c.conditions : [],
+        saturation: c.max_hp > 0 ? Math.max(0, Math.min(1, (c.current_hp / c.max_hp) * 2)) : 1,
+        show_death_saves: c.show_death_saves,
+        death_save_fails:     (c.current_hp <= 0 && c.show_death_saves) ? (c.death_save_fails     ?? 0) : null,
+        death_save_successes: (c.current_hp <= 0 && c.show_death_saves) ? (c.death_save_successes ?? 0) : null,
       }));
+
+    // Remap current_turn_index to the visible list.
+    // If the active combatant is hidden, hold on the last visible combatant
+    // before it so the player spotlight doesn't jump ahead.
+    if (combatants.length > 0 && visible.length > 0) {
+      const activeIdx = room.current_turn_index % combatants.length;
+      const active = combatants[activeIdx];
+      if (active && active.is_visible) {
+        returnTurnIndex = visible.findIndex(v => v.id === active.id);
+        if (returnTurnIndex === -1) returnTurnIndex = 0;
+      } else {
+        // Walk backwards through the full list to find the last visible combatant
+        returnTurnIndex = 0;
+        for (let i = 1; i < combatants.length; i++) {
+          const prev = combatants[(activeIdx - i + combatants.length) % combatants.length];
+          if (prev && prev.is_visible) {
+            const vi = visible.findIndex(v => v.id === prev.id);
+            if (vi !== -1) { returnTurnIndex = vi; break; }
+          }
+        }
+      }
+    } else {
+      returnTurnIndex = 0;
+    }
   }
 
   return {
     id: room.id,
     code: room.code,
     name: room.name,
-    current_turn_index: room.current_turn_index,
+    current_turn_index: returnTurnIndex,
     current_round: room.current_round,
     bg_image_url:   room.bg_image_url   || '',
     bg_image_x:     room.bg_image_x     ?? 50,
@@ -383,27 +420,33 @@ wss.on('connection', async (ws, req) => {
         const { rows: crow } = await pool.query('SELECT * FROM combatants WHERE id = $1', [id]);
         const c = crow[0];
         if (!c || c.room_id !== r.id) return;
+        const newHp = parseInt(current_hp) ?? c.current_hp;
         await pool.query(
           'UPDATE combatants SET current_hp=$1, temp_hp=$2, max_hp=$3 WHERE id=$4',
           [
-            parseInt(current_hp) ?? c.current_hp,
+            newHp,
             Math.max(0, parseInt(temp_hp) || 0),
             Math.max(1, parseInt(max_hp) || 1),
             id,
           ]
         );
+        // If HP is restored above 0, reset death saves and remove Dead condition
+        if (newHp > 0) {
+          await pool.query('UPDATE combatants SET death_save_fails=0, death_save_successes=0 WHERE id=$1', [id]);
+          await pool.query('DELETE FROM combatant_conditions WHERE combatant_id=$1 AND condition_name=$2', [id, 'Dead']);
+        }
         await broadcastRoom(roomCode, wss);
         return;
       }
 
       // ── update_visibility ──────────────────────────────────────────────────
       if (type === 'update_visibility') {
-        const { id, show_name, show_hp, show_conditions, is_visible } = data;
+        const { id, show_name, show_hp, show_conditions, is_visible, show_death_saves } = data;
         const { rows: crow } = await pool.query('SELECT room_id FROM combatants WHERE id = $1', [id]);
         if (!crow[0] || crow[0].room_id !== r.id) return;
         await pool.query(
-          'UPDATE combatants SET show_name=$1, show_hp=$2, show_conditions=$3, is_visible=$4 WHERE id=$5',
-          [!!show_name, !!show_hp, !!show_conditions, !!is_visible, id]
+          'UPDATE combatants SET show_name=$1, show_hp=$2, show_conditions=$3, is_visible=$4, show_death_saves=$5 WHERE id=$6',
+          [!!show_name, !!show_hp, !!show_conditions, !!is_visible, show_death_saves !== undefined ? !!show_death_saves : true, id]
         );
         await broadcastRoom(roomCode, wss);
         return;
@@ -427,6 +470,30 @@ wss.on('connection', async (ws, req) => {
         if (!crow[0] || crow[0].room_id !== r.id) return;
         await pool.query('UPDATE combatants SET image_url=$1 WHERE id=$2',
           [(image_url || '').substring(0, 500), id]);
+        await broadcastRoom(roomCode, wss);
+        return;
+      }
+
+      // ── update_death_saves ────────────────────────────────────────────────
+      if (type === 'update_death_saves') {
+        const { id, fails, successes } = data;
+        const { rows: crow } = await pool.query('SELECT room_id FROM combatants WHERE id=$1', [id]);
+        if (!crow[0] || crow[0].room_id !== r.id) return;
+        await pool.query(
+          'UPDATE combatants SET death_save_fails=$1, death_save_successes=$2 WHERE id=$3',
+          [Math.max(0, Math.min(3, parseInt(fails) || 0)), Math.max(0, Math.min(3, parseInt(successes) || 0)), id]
+        );
+        await broadcastRoom(roomCode, wss);
+        return;
+      }
+
+      // ── update_name ───────────────────────────────────────────────────────
+      if (type === 'update_name') {
+        const { id, name } = data;
+        if (!name || !name.trim()) return;
+        const { rows: crow } = await pool.query('SELECT room_id FROM combatants WHERE id=$1', [id]);
+        if (!crow[0] || crow[0].room_id !== r.id) return;
+        await pool.query('UPDATE combatants SET name=$1 WHERE id=$2', [name.trim().substring(0, 100), id]);
         await broadcastRoom(roomCode, wss);
         return;
       }

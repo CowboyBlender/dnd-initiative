@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>D&D Initiative Tracker</title>
+  <title>Soju Turn Tracker</title>
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
   <div class="landing-page">
     <div class="auth-box">
-      <h1>D&D Initiative Tracker</h1>
+      <h1>Soju Turn Tracker</h1>
 
       <div class="tabs">
         <button class="tab active" data-tab="login">DM Login</button>
@@ -20,7 +20,10 @@
       <div id="tab-login" class="tab-content active">
         <form class="auth-form" id="login-form">
           <input type="text" name="username" placeholder="Username" required autocomplete="username">
-          <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
+          <div class="password-wrap">
+            <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
+            <button type="button" class="pw-toggle pw-closed" aria-label="Show password">👁</button>
+          </div>
           <label class="form-checkbox-row">
             <input type="checkbox" name="remember_me">
             Remember me
@@ -32,7 +35,10 @@
       <div id="tab-register" class="tab-content">
         <form class="auth-form" id="register-form">
           <input type="text" name="username" placeholder="Username (2–20 characters)" required autocomplete="username">
-          <input type="password" name="password" placeholder="Password (min. 6 characters)" required autocomplete="new-password">
+          <div class="password-wrap">
+            <input type="password" name="password" placeholder="Password (min. 6 characters)" required autocomplete="new-password">
+            <button type="button" class="pw-toggle pw-closed" aria-label="Show password">👁</button>
+          </div>
           <button type="submit" class="btn-primary">Create DM Account</button>
         </form>
       </div>

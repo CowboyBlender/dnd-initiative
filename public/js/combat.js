@@ -2,7 +2,7 @@
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const CONDITIONS = [
-  'Blinded', 'Charmed', 'Concentrating', 'Deafened', 'Exhaustion', 'Frightened',
+  'Blinded', 'Charmed', 'Concentrating', 'Dead', 'Deafened', 'Exhaustion', 'Frightened',
   'Grappled', 'Incapacitated', 'Invisible', 'Paralyzed', 'Petrified',
   'Poisoned', 'Prone', 'Restrained', 'Stunned', 'Unconscious',
 ];
@@ -226,6 +226,8 @@ function buildCombatantCard(c, isActive) {
 
   const hpPct  = c.max_hp > 0 ? Math.max(0, (c.current_hp / c.max_hp) * 100) : 0;
   const hpCls  = hpPct > 50 ? 'hp-full' : hpPct > 25 ? 'hp-mid' : 'hp-low';
+  const hpSat  = c.max_hp > 0 ? Math.max(0, Math.min(1, (c.current_hp / c.max_hp) * 2)) : 1;
+  const isPcOrNpc = c.combatant_type === 'PC' || c.combatant_type === 'NPC';
 
   const imgX     = c.image_x     ?? 50;
   const imgY     = c.image_y     ?? 50;
@@ -234,7 +236,7 @@ function buildCombatantCard(c, isActive) {
   // Portrait
   const portraitHTML = c.image_url
     ? `<img class="card-portrait" src="${esc(c.image_url)}" alt="${esc(c.name)}"
-            style="object-position:${imgX}% ${imgY}%;transform:scale(${imgScale/100});transform-origin:${imgX}% ${imgY}%"
+            style="object-position:${imgX}% ${imgY}%;transform:scale(${imgScale/100});transform-origin:${imgX}% ${imgY}%;filter:saturate(${hpSat})"
             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
       + `<div class="card-portrait-placeholder" style="display:none">${initials(c.name)}</div>`
     : `<div class="card-portrait-placeholder">${initials(c.name)}</div>`;
@@ -251,7 +253,7 @@ function buildCombatantCard(c, isActive) {
     <div class="card-top">
       ${portraitHTML}
       <div class="card-meta">
-        <div class="card-name">${esc(c.name)}</div>
+        <input class="card-name-input" type="text" value="${esc(c.name)}" maxlength="100">
         <div class="card-sub">
           <span>${esc(c.combatant_type)}</span>
           <span>Init: ${c.initiative}</span>
@@ -262,6 +264,7 @@ function buildCombatantCard(c, isActive) {
       <button class="card-delete btn-icon" title="Delete">×</button>
     </div>
 
+    ${c.combatant_type !== 'Layer Action' ? `
     <div class="card-hp">
       <label>HP</label>
       <input class="hp-input" type="number" name="current_hp" value="${c.current_hp}" min="0" max="${c.max_hp * 2}">
@@ -269,7 +272,7 @@ function buildCombatantCard(c, isActive) {
       <input class="hp-input" type="number" name="max_hp" value="${c.max_hp}" min="1">
       <label style="margin-left:6px">Tmp</label>
       <input class="hp-input" type="number" name="temp_hp" value="${c.temp_hp}" min="0">
-    </div>
+    </div>` : ''}
 
     <div class="card-conditions-row">
       ${condBadges}
@@ -280,15 +283,33 @@ function buildCombatantCard(c, isActive) {
       <button class="vis-btn ${c.show_name ? 'on' : ''}" data-vis="show_name" title="Show name to players">Name</button>
       <button class="vis-btn ${c.show_hp   ? 'on' : ''}" data-vis="show_hp"   title="Show HP to players">HP</button>
       <button class="vis-btn ${c.show_conditions ? 'on' : ''}" data-vis="show_conditions" title="Show conditions to players">Cond</button>
+      ${isPcOrNpc ? `<button class="vis-btn ${c.show_death_saves ? 'on' : ''}" data-vis="show_death_saves" title="Show death saves to players">DS</button>` : ''}
     </div>
 
     <button class="vis-btn hide-players-btn ${!c.is_visible ? 'hidden-all' : ''}" data-vis="is_visible" title="Toggle whether this combatant is visible to players">
       ${c.is_visible ? 'Visible to Players' : 'Hidden from Players'}
     </button>
 
+    ${c.combatant_type !== 'Layer Action' ? `
     <div class="hp-bar-track" style="margin-top:6px">
       <div class="hp-bar-fill ${hpCls}" style="width:${hpPct}%"></div>
-    </div>
+    </div>` : ''}
+
+    ${isPcOrNpc && c.current_hp <= 0 ? `
+    <div class="card-death-saves">
+      <div class="death-saves-row fails">
+        <span class="death-saves-label">Fails</span>
+        <input type="checkbox" class="death-fail" ${(c.death_save_fails ?? 0) >= 1 ? 'checked' : ''}>
+        <input type="checkbox" class="death-fail" ${(c.death_save_fails ?? 0) >= 2 ? 'checked' : ''}>
+        <input type="checkbox" class="death-fail" ${(c.death_save_fails ?? 0) >= 3 ? 'checked' : ''}>
+      </div>
+      <div class="death-saves-row successes">
+        <span class="death-saves-label">Successes</span>
+        <input type="checkbox" class="death-success" ${(c.death_save_successes ?? 0) >= 1 ? 'checked' : ''}>
+        <input type="checkbox" class="death-success" ${(c.death_save_successes ?? 0) >= 2 ? 'checked' : ''}>
+        <input type="checkbox" class="death-success" ${(c.death_save_successes ?? 0) >= 3 ? 'checked' : ''}>
+      </div>
+    </div>` : ''}
 
     <details class="card-crop-details">
       <summary>Image</summary>
@@ -337,6 +358,18 @@ function buildCombatantCard(c, isActive) {
   colorPicker.addEventListener('mousedown', e => { e.stopPropagation(); card.draggable = false; });
   colorPicker.addEventListener('mouseup', () => { card.draggable = true; });
 
+  // Name input – commit on blur/Enter
+  const nameInput = card.querySelector('.card-name-input');
+  if (nameInput) {
+    nameInput.addEventListener('change', () => {
+      const newName = nameInput.value.trim();
+      if (!newName) { nameInput.value = c.name; return; }
+      send({ type: 'update_name', data: { id: c.id, name: newName } });
+    });
+    nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') nameInput.blur(); });
+    nameInput.addEventListener('mousedown', e => e.stopPropagation());
+  }
+
   // HP inputs (send on change = when field is blurred with a different value)
   const hpInputs = card.querySelectorAll('.hp-input');
   hpInputs.forEach(input => {
@@ -377,22 +410,73 @@ function buildCombatantCard(c, isActive) {
       e.stopPropagation();
       const field = btn.dataset.vis;
       // Build current visibility from the card's current button states
-      const getVis = key => card.querySelector(`[data-vis="${key}"]`).classList.contains('on');
+      const getVis = key => card.querySelector(`[data-vis="${key}"]`)?.classList.contains('on') ?? false;
       const getShown = () => !card.querySelector('[data-vis="is_visible"]').classList.contains('hidden-all');
 
-      let show_name       = getVis('show_name');
-      let show_hp         = getVis('show_hp');
-      let show_conditions = getVis('show_conditions');
-      let is_visible      = getShown();
+      let show_name        = getVis('show_name');
+      let show_hp          = getVis('show_hp');
+      let show_conditions  = getVis('show_conditions');
+      let show_death_saves = getVis('show_death_saves');
+      let is_visible       = getShown();
 
-      if (field === 'show_name')       show_name       = !show_name;
-      else if (field === 'show_hp')    show_hp         = !show_hp;
+      if (field === 'show_name')         show_name        = !show_name;
+      else if (field === 'show_hp')      show_hp          = !show_hp;
       else if (field === 'show_conditions') show_conditions = !show_conditions;
-      else if (field === 'is_visible') is_visible      = !is_visible;
+      else if (field === 'show_death_saves') show_death_saves = !show_death_saves;
+      else if (field === 'is_visible')   is_visible       = !is_visible;
 
-      send({ type: 'update_visibility', data: { id: c.id, show_name, show_hp, show_conditions, is_visible } });
+      send({ type: 'update_visibility', data: { id: c.id, show_name, show_hp, show_conditions, is_visible, show_death_saves } });
     });
   });
+
+  // Death saving throw checkboxes (PC/NPC only, shown when HP ≤ 0)
+  if (isPcOrNpc && c.current_hp <= 0) {
+    const failBoxes    = [...card.querySelectorAll('.death-fail')];
+    const successBoxes = [...card.querySelectorAll('.death-success')];
+
+    const handleFails = () => {
+      const fails = failBoxes.filter(cb => cb.checked).length;
+      if (fails >= 3) {
+        // 3rd fail → Dead condition + reset saves
+        const alreadyDead = c.conditions.some(cond => cond.condition_name === 'Dead');
+        if (!alreadyDead) {
+          send({ type: 'toggle_condition', data: { combatant_id: c.id, condition_name: 'Dead' } });
+        }
+        send({ type: 'update_death_saves', data: { id: c.id, fails: 0, successes: 0 } });
+      } else {
+        const successes = successBoxes.filter(cb => cb.checked).length;
+        send({ type: 'update_death_saves', data: { id: c.id, fails, successes } });
+      }
+    };
+
+    const handleSuccesses = () => {
+      const successes = successBoxes.filter(cb => cb.checked).length;
+      if (successes >= 3) {
+        // 3rd success → stabilize at 1 HP (server resets saves automatically)
+        send({
+          type: 'update_hp',
+          data: {
+            id: c.id,
+            current_hp: 1,
+            max_hp: parseInt(card.querySelector('[name=max_hp]').value) || c.max_hp,
+            temp_hp: parseInt(card.querySelector('[name=temp_hp]').value) || 0,
+          },
+        });
+      } else {
+        const fails = failBoxes.filter(cb => cb.checked).length;
+        send({ type: 'update_death_saves', data: { id: c.id, fails, successes } });
+      }
+    };
+
+    failBoxes.forEach(cb => {
+      cb.addEventListener('change', handleFails);
+      cb.addEventListener('mousedown', e => e.stopPropagation());
+    });
+    successBoxes.forEach(cb => {
+      cb.addEventListener('change', handleSuccesses);
+      cb.addEventListener('mousedown', e => e.stopPropagation());
+    });
+  }
 
   // Drag-and-drop reorder
   card.addEventListener('dragstart', e => {
@@ -576,6 +660,7 @@ function renderSpotlight() {
       <div class="spotlight-body">
         <div class="spotlight-name">${esc(cur.name)}</div>
         <div class="spotlight-type">${esc(cur.combatant_type)}</div>
+        ${cur.combatant_type !== 'Layer Action' ? `
         <div class="hp-bar-wrap">
           <div class="hp-bar-label">
             <span>HP</span>
@@ -584,7 +669,7 @@ function renderSpotlight() {
           <div class="hp-bar-track">
             <div class="hp-bar-fill ${hpCls}" style="width:${hpPct}%"></div>
           </div>
-        </div>
+        </div>` : ''}
         <div class="spotlight-conditions">${condHtml || '<span style="color:var(--text-muted);font-size:13px">No conditions</span>'}</div>
       </div>
     </div>

@@ -143,14 +143,15 @@ function buildInitiativeCard(c, isActive) {
   const imgY     = c.image_y     ?? 50;
   const imgScale = c.image_scale ?? 100;
 
+  const sat = c.saturation ?? 1;
   const portraitHtml = c.image_url
     ? `<img class="player-card-portrait" src="${esc(c.image_url)}"
-            style="object-position:${imgX}% ${imgY}%;transform:scale(${imgScale/100});transform-origin:${imgX}% ${imgY}%"
+            style="object-position:${imgX}% ${imgY}%;transform:scale(${imgScale/100});transform-origin:${imgX}% ${imgY}%;filter:saturate(${sat})"
             alt="" onerror="this.style.display='none'">`
     : `<div class="player-card-portrait-placeholder">${esc((c.name || '?').trim().substring(0, 2).toUpperCase())}</div>`;
 
   let hpHtml = '';
-  if (c.show_hp && c.max_hp != null) {
+  if (c.combatant_type !== 'Layer Action' && c.show_hp && c.max_hp != null) {
     const pct = c.max_hp > 0 ? Math.max(0, Math.min(100, (c.current_hp / c.max_hp) * 100)) : 0;
     const cls = pct > 50 ? 'hp-full' : pct > 25 ? 'hp-mid' : 'hp-low';
     hpHtml = `
@@ -235,10 +236,11 @@ function buildSpotlightHtml(cur, next) {
   const imgY     = cur.image_y     ?? 50;
   const imgScale = cur.image_scale ?? 100;
 
+  const curSat = cur.saturation ?? 1;
   const imgSection = cur.image_url
     ? `<img class="spotlight-bg-img"
              src="${esc(cur.image_url)}"
-             style="object-position:${imgX}% ${imgY}%;transform:scale(${imgScale/100});transform-origin:${imgX}% ${imgY}%"
+             style="object-position:${imgX}% ${imgY}%;transform:scale(${imgScale/100});transform-origin:${imgX}% ${imgY}%;filter:saturate(${curSat})"
              alt="${esc(cur.name)}"
              onerror="this.style.display='none';document.getElementById('spotlight-fallback-${cur.id}').style.display='flex'">`
     + `<div id="spotlight-fallback-${cur.id}" class="spotlight-fallback" style="display:none">${esc(cur.name)}</div>`
@@ -247,24 +249,40 @@ function buildSpotlightHtml(cur, next) {
   return `${imgSection}<div class="spotlight-gradient-overlay">${buildOverlayContent(cur, next)}</div>`;
 }
 
-// ── Build overlay content (HP, conditions, expired badges, up-next) ───────────
+// ── Build overlay content (conditions, death saves, expired badges, up-next) ──
 function buildOverlayContent(cur, next) {
-  const hpPct = (cur.show_hp && cur.max_hp) ? Math.max(0, Math.min(100, (cur.current_hp / cur.max_hp) * 100)) : 0;
-  const hpCls = hpPct > 50 ? 'hp-full' : hpPct > 25 ? 'hp-mid' : 'hp-low';
-
   const condHtml = (cur.show_conditions && cur.conditions.length)
     ? cur.conditions.map(cd =>
         `<span class="spotlight-cond-badge${cd.condition_name === 'Exhaustion' ? ' exhaust' : ''}">${esc(formatCondLabel(cd))}</span>`
       ).join('')
     : '';
 
-  const hpBarHtml = (cur.show_hp && cur.max_hp != null) ? `
+  // HP bar: only for non-Layer Action combatants
+  const hpPct = (cur.combatant_type !== 'Layer Action' && cur.show_hp && cur.max_hp)
+    ? Math.max(0, Math.min(100, (cur.current_hp / cur.max_hp) * 100)) : 0;
+  const hpCls = hpPct > 50 ? 'hp-full' : hpPct > 25 ? 'hp-mid' : 'hp-low';
+  const hpBarHtml = (cur.combatant_type !== 'Layer Action' && cur.show_hp && cur.max_hp != null) ? `
     <div class="spotlight-hp-bar">
       <div class="hp-bar-label">
         <span>HP</span>
         <span>${cur.current_hp}${cur.temp_hp > 0 ? ` + ${cur.temp_hp} tmp` : ''} / ${cur.max_hp}</span>
       </div>
       <div class="hp-bar-track"><div class="hp-bar-fill ${hpCls}" style="width:${hpPct}%"></div></div>
+    </div>` : '';
+
+  // Death saves: PC/NPC at 0 HP with DM visibility enabled
+  const showDeathSaves = (cur.combatant_type === 'PC' || cur.combatant_type === 'NPC')
+    && cur.death_save_fails !== null && cur.death_save_successes !== null;
+  const deathSavesHtml = showDeathSaves ? `
+    <div class="spotlight-death-saves">
+      <div class="death-save-row fails">
+        <span class="ds-label">Fails</span>
+        ${[0,1,2].map(i => `<span class="ds-pip fail${cur.death_save_fails > i ? ' filled' : ''}"></span>`).join('')}
+      </div>
+      <div class="death-save-row successes">
+        <span class="ds-label">Successes</span>
+        ${[0,1,2].map(i => `<span class="ds-pip success${cur.death_save_successes > i ? ' filled' : ''}"></span>`).join('')}
+      </div>
     </div>` : '';
 
   // Only show expired badges for the current combatant
@@ -292,6 +310,7 @@ function buildOverlayContent(cur, next) {
       <div class="spotlight-type-badge">${esc(cur.combatant_type)}</div>
       ${hpBarHtml}
       ${condHtml ? `<div class="spotlight-conditions">${condHtml}</div>` : ''}
+      ${deathSavesHtml}
     </div>
     ${nextHtml}`;
 }
@@ -307,7 +326,7 @@ function updateOverlay(cur, next) {
     return;
   }
 
-  // Update image position/scale live without reloading the image element
+  // Update image position/scale/saturation live without reloading the image element
   const img = curEl.querySelector('.spotlight-bg-img');
   if (img) {
     const imgX = cur.image_x ?? 50;
@@ -316,6 +335,7 @@ function updateOverlay(cur, next) {
     img.style.objectPosition = `${imgX}% ${imgY}%`;
     img.style.transform = `scale(${imgScale / 100})`;
     img.style.transformOrigin = `${imgX}% ${imgY}%`;
+    img.style.filter = `saturate(${cur.saturation ?? 1})`;
   }
 
   // Snapshot spotlight HP bar width for smooth transition
