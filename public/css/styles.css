@@ -1441,22 +1441,31 @@ dialog#condition-dialog::backdrop {
   .conditions-grid { grid-template-columns: repeat(2, 1fr); }
   dialog#condition-dialog { width: 95vw; padding: 16px; }
 
-  /* ── Combat / DM page ─────────────────────────────────────────────────── */
+  /* ── Combat / DM page ────────────────────────────────────────────────────
+     Page scrolls vertically. Panels stack: header → initiative → spotlight → footer.
+  ── */
   .combat-page { height: auto; min-height: 100vh; overflow-y: auto; }
+  .combat-body { flex-direction: column; overflow: visible; flex: none; }
 
-  /* Compact header so all items fit on one line */
-  .combat-header { padding: 8px 12px; gap: 6px; }
+  /* Compact header */
+  .combat-header { padding: 8px 12px; gap: 6px; flex-wrap: wrap; }
   .combat-header h1 { font-size: 14px; }
   .code-badge { font-size: 13px; letter-spacing: 2px; padding: 2px 6px; }
   #copy-link-btn { font-size: 11px; padding: 4px 8px; }
 
-  /* Stack initiative panel above spotlight */
-  .combat-body { flex-direction: column; overflow: visible; }
+  /* Initiative panel: full width, expands to show all cards */
   .initiative-panel {
     width: 100%;
-    max-height: none;   /* let all cards show; page scrolls */
+    height: auto;
+    overflow: visible;   /* override overflow:hidden so cards aren't clipped */
     border-right: none;
     border-bottom: 1px solid var(--border);
+  }
+  /* Combatants list: natural height, no scroll container (page scrolls instead) */
+  .combatants-list {
+    flex: none;
+    overflow: visible;
+    height: auto;
   }
 
   /* Spotlight panel: tighter image, full width */
@@ -1466,7 +1475,7 @@ dialog#condition-dialog::backdrop {
   .spotlight-notes { max-width: 100%; }
   .up-next-card { max-width: 100%; }
 
-  /* Sticky footer so turn controls stay accessible while scrolling */
+  /* Sticky footer stays visible while scrolling */
   .combat-footer {
     position: sticky;
     bottom: 0;
@@ -1474,23 +1483,58 @@ dialog#condition-dialog::backdrop {
     background: var(--surface);
   }
 
-  /* ── Player page ──────────────────────────────────────────────────────── */
-  .player-page { height: auto; overflow-y: auto; }
-  .player-header { padding: 8px 14px; }
+  /* ── Player page ──────────────────────────────────────────────────────────
+     Fixed 100vh layout: header → image area (fixed height) → scrollable initiative list.
+     player-initiative is inside player-body in the DOM, so we use a column
+     flex trick: body becomes a column, image layers are sized by padding-top,
+     and initiative sits below.
+  ── */
+  .player-page {
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .player-header { padding: 8px 14px; flex-shrink: 0; }
   .player-header h1 { font-size: 15px; }
 
-  /* Image spotlight area: fixed height, not too tall */
+  /* player-body holds the image + initiative panel stacked vertically */
   .player-body {
-    height: 52vw;
-    min-height: 200px;
-    max-height: 48vh;
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
   }
 
-  /* Initiative list: no max-height, shows all combatants */
+  /* Spotlight layers fill a fixed image area at the top.
+     We give them an explicit height via a wrapper hack:
+     spotlight-layer is absolute so we constrain with a pseudo-height block. */
+  .spotlight-layer {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 42vw;
+    min-height: 160px;
+    max-height: 42vh;
+  }
+
+  /* Invisible spacer that pushes initiative list below the image */
+  .player-body::before {
+    content: '';
+    display: block;
+    flex-shrink: 0;
+    height: 42vw;
+    min-height: 160px;
+    max-height: 42vh;
+  }
+
+  /* Initiative list: fills remaining space below image, scrolls internally */
   .player-initiative {
     position: static;
+    flex: 1;
     width: 100%;
-    height: auto;
+    min-height: 0;
+    overflow-y: auto;
     max-height: none;
     backdrop-filter: none;
     background: var(--surface);
