@@ -275,7 +275,7 @@ function buildCombatantCard(c, isActive) {
       <input class="hp-input" type="number" name="temp_hp" value="${c.temp_hp}" min="0">
     </div>
     <div class="hp-adjust-row">
-      <input class="hp-adjust-input" type="number" min="1" placeholder="Amt" title="Amount to heal or damage">
+      <input class="hp-adjust-input" type="number" min="1" placeholder="Heal/Damage" title="Amount to heal or damage">
       <button class="hp-adjust-btn heal-btn" title="Heal">+</button>
       <button class="hp-adjust-btn dmg-btn" title="Damage">−</button>
     </div>` : ''}

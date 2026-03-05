@@ -597,7 +597,7 @@ input[type="number"] { width: auto; }
 }
 .hp-sep { color: var(--text-muted); }
 .hp-adjust-row { display: flex; align-items: center; gap: 4px; margin-top: 5px; width: 100%; }
-.hp-adjust-input { width: 48px; text-align: center; padding: 3px 4px; font-size: 12px; }
+.hp-adjust-input { width: 88px; text-align: center; padding: 3px 4px; font-size: 12px; }
 .hp-adjust-btn { padding: 2px 8px; font-size: 13px; font-weight: 700; border-radius: 4px; min-width: 28px; }
 .heal-btn { background: rgba(39,174,96,0.25); border-color: var(--green); color: var(--green); }
 .heal-btn:hover { background: rgba(39,174,96,0.45); }
