@@ -1433,27 +1433,93 @@ dialog#condition-dialog::backdrop {
 
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 700px) {
-  /* Combat page */
-  .combat-body { flex-direction: column; overflow: visible; }
-  .initiative-panel { width: 100%; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--border); }
-  .combat-page { height: auto; overflow: auto; }
 
-  /* Player page: stack the panel below the image on small screens */
-  .player-page { height: auto; overflow: auto; }
-  .player-body { height: 60vw; min-height: 260px; }
+  /* ── Auth ─────────────────────────────────────────────────────────────── */
+  .auth-box { width: 95vw; padding: 24px 16px; }
+
+  /* ── Condition dialog ─────────────────────────────────────────────────── */
+  .conditions-grid { grid-template-columns: repeat(2, 1fr); }
+  dialog#condition-dialog { width: 95vw; padding: 16px; }
+
+  /* ── Combat / DM page ─────────────────────────────────────────────────── */
+  .combat-page { height: auto; min-height: 100vh; overflow-y: auto; }
+
+  /* Compact header so all items fit on one line */
+  .combat-header { padding: 8px 12px; gap: 6px; }
+  .combat-header h1 { font-size: 14px; }
+  .code-badge { font-size: 13px; letter-spacing: 2px; padding: 2px 6px; }
+  #copy-link-btn { font-size: 11px; padding: 4px 8px; }
+
+  /* Stack initiative panel above spotlight */
+  .combat-body { flex-direction: column; overflow: visible; }
+  .initiative-panel {
+    width: 100%;
+    max-height: none;   /* let all cards show; page scrolls */
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Spotlight panel: tighter image, full width */
+  .spotlight-panel { padding: 12px; }
+  .spotlight-card { max-width: 100%; }
+  .spotlight-image-wrap { height: 160px; }
+  .spotlight-notes { max-width: 100%; }
+  .up-next-card { max-width: 100%; }
+
+  /* Sticky footer so turn controls stay accessible while scrolling */
+  .combat-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    background: var(--surface);
+  }
+
+  /* ── Player page ──────────────────────────────────────────────────────── */
+  .player-page { height: auto; overflow-y: auto; }
+  .player-header { padding: 8px 14px; }
+  .player-header h1 { font-size: 15px; }
+
+  /* Image spotlight area: fixed height, not too tall */
+  .player-body {
+    height: 52vw;
+    min-height: 200px;
+    max-height: 48vh;
+  }
+
+  /* Initiative list: no max-height, shows all combatants */
   .player-initiative {
     position: static;
     width: 100%;
     height: auto;
+    max-height: none;
     backdrop-filter: none;
     background: var(--surface);
     border-left: none;
     border-top: 1px solid var(--border);
-    max-height: 40vh;
   }
-  .spotlight-gradient-overlay { padding: 12px 12px 16px; }
-  .spotlight-name { font-size: 24px; }
 
-  .conditions-grid { grid-template-columns: repeat(2, 1fr); }
-  .auth-box { width: 95vw; padding: 24px 16px; }
+  /* Tighter initiative cards on mobile */
+  .player-combatant-card { padding: 8px 10px; gap: 8px; }
+  .player-card-portrait,
+  .player-card-portrait-placeholder { width: 36px; height: 36px; }
+  .player-card-name { font-size: 12px; }
+  .player-card-hp { font-size: 11px; }
+
+  /* Spotlight overlay: smaller text, tighter spacing */
+  .spotlight-gradient-overlay { padding: 8px 12px 12px; }
+  .spotlight-name { font-size: 20px; line-height: 1.1; }
+  .spotlight-type-badge { font-size: 11px; letter-spacing: 1px; margin-bottom: 6px; margin-top: 2px; }
+  .spotlight-conditions { gap: 4px; margin-bottom: 4px; }
+  .spotlight-cond-badge { font-size: 11px; padding: 3px 8px; }
+
+  /* Up-next pill: smaller on mobile */
+  .spotlight-up-next { margin-top: 6px; padding: 4px 10px 4px 5px; gap: 6px; max-width: 260px; }
+  .spotlight-up-next .up-next-portrait { width: 24px; height: 24px; }
+  .spotlight-up-next .up-next-name { font-size: 12px; }
+  .spotlight-up-next .up-next-label { font-size: 10px; }
+
+  /* Death save pips: smaller on mobile */
+  .spotlight-death-saves { margin-top: 6px; gap: 4px; }
+  .ds-label { font-size: 11px; min-width: 78px; }
+  .ds-pip { width: 14px; height: 14px; }
 }
