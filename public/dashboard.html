@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Encounters – D&D Initiative Tracker</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="dashboard-page">
+    <header class="dash-header">
+      <h1>⚔️ My Encounters</h1>
+      <div class="dash-user">
+        <span id="username-display"></span>
+        <button id="logout-btn">Logout</button>
+      </div>
+    </header>
+
+    <div class="dash-content">
+      <form class="create-room-form" id="create-room-form">
+        <input type="text" name="name" placeholder="New encounter name…" required maxlength="60">
+        <button type="submit" class="btn-primary">+ Create Encounter</button>
+      </form>
+
+      <div class="rooms-grid" id="rooms-grid">
+        <div class="empty-rooms" id="empty-msg">Loading…</div>
+      </div>
+    </div>
+  </div>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

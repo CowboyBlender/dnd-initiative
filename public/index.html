@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>D&D Initiative Tracker</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="landing-page">
+    <div class="auth-box">
+      <h1>D&D Initiative Tracker</h1>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="login">DM Login</button>
+        <button class="tab" data-tab="register">Register</button>
+        <button class="tab" data-tab="join">Join Room</button>
+      </div>
+
+      <div id="tab-login" class="tab-content active">
+        <form class="auth-form" id="login-form">
+          <input type="text" name="username" placeholder="Username" required autocomplete="username">
+          <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
+          <label class="form-checkbox-row">
+            <input type="checkbox" name="remember_me">
+            Remember me
+          </label>
+          <button type="submit" class="btn-primary">Login as Dungeon Master</button>
+        </form>
+      </div>
+
+      <div id="tab-register" class="tab-content">
+        <form class="auth-form" id="register-form">
+          <input type="text" name="username" placeholder="Username (2–20 characters)" required autocomplete="username">
+          <input type="password" name="password" placeholder="Password (min. 6 characters)" required autocomplete="new-password">
+          <button type="submit" class="btn-primary">Create DM Account</button>
+        </form>
+      </div>
+
+      <div id="tab-join" class="tab-content">
+        <form class="auth-form" id="join-form">
+          <input type="text" name="code" placeholder="Room Code (e.g. AB3X9Z)" required
+                 maxlength="6" style="text-transform:uppercase;letter-spacing:4px;font-family:monospace;font-size:18px;text-align:center">
+          <button type="submit" class="btn-primary">Enter Room</button>
+        </form>
+        <p style="margin-top:12px;font-size:12px;color:var(--text-muted);text-align:center">
+          Get the room code from your Dungeon Master.
+        </p>
+      </div>
+
+      <div class="error-msg" id="error-msg"></div>
+    </div>
+  </div>
+  <script src="/js/landing.js"></script>
+</body>
+</html>

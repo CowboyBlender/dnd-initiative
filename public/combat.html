@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Combat – D&D Initiative Tracker</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="combat-page">
+
+    <!-- Header -->
+    <header class="combat-header">
+      <h1><span id="room-name">Loading…</span></h1>
+      <div class="room-share">
+        <span>Code: <span class="code-badge" id="room-code">——</span></span>
+        <button id="copy-link-btn">Copy Player Link</button>
+      </div>
+      <a href="/dashboard.html" class="header-link">← Dashboard</a>
+    </header>
+
+    <!-- Main body: initiative list + spotlight -->
+    <div class="combat-body">
+
+      <!-- Left: Initiative List -->
+      <aside class="initiative-panel">
+
+        <!-- Add combatant form -->
+        <div class="add-form-section">
+          <button class="add-form-toggle" id="add-form-toggle">+ Add Combatant</button>
+          <form class="add-combatant-form hidden" id="add-combatant-form">
+            <input type="text" name="name" placeholder="Name *" required maxlength="60">
+            <div class="form-row">
+              <select name="combatant_type" style="flex:1">
+                <option value="PC">PC</option>
+                <option value="Monster" selected>Monster</option>
+                <option value="NPC">NPC</option>
+                <option value="Layer Action">Layer Action</option>
+              </select>
+              <label>Init</label>
+              <input type="number" name="initiative" value="0" style="width:55px">
+            </div>
+            <div class="form-row">
+              <label>Max HP</label>
+              <input type="number" name="max_hp" value="10" min="1" style="width:70px">
+            </div>
+            <input type="url" name="image_url" placeholder="Image URL (optional)">
+            <div class="form-row">
+              <label>Card Color</label>
+              <input type="color" name="card_color" value="#2a2a40">
+            </div>
+            <details class="form-crop-details">
+              <summary style="font-size:12px;color:var(--text-muted);cursor:pointer">Image Crop / Focus</summary>
+              <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+                <label style="font-size:12px;color:var(--text-muted)">Horizontal
+                  <input type="range" name="image_x" min="0" max="100" value="50" style="width:100%">
+                </label>
+                <label style="font-size:12px;color:var(--text-muted)">Vertical
+                  <input type="range" name="image_y" min="0" max="100" value="50" style="width:100%">
+                </label>
+                <label style="font-size:12px;color:var(--text-muted)">Zoom
+                  <input type="range" name="image_scale" min="10" max="100" value="100" style="width:100%">
+                </label>
+              </div>
+            </details>
+            <input type="text" name="layer_action" placeholder="Notes (optional)" maxlength="200">
+            <label class="form-checkbox-row">
+              <input type="checkbox" name="hidden_from_players">
+              Start hidden from players
+            </label>
+            <button type="submit" class="btn-primary">Add to Initiative</button>
+          </form>
+        </div>
+
+        <!-- Room background image -->
+        <div class="bg-form-section">
+          <button class="add-form-toggle" id="bg-form-toggle">Room Background</button>
+          <div class="bg-form hidden" id="bg-form">
+            <input type="url" id="bg-url-input" placeholder="Background Image URL">
+            <div class="card-crop-controls" style="margin-top:6px">
+              <label>H <input type="range" id="bg-x" min="0" max="100" value="50"></label>
+              <label>V <input type="range" id="bg-y" min="0" max="100" value="50"></label>
+              <label>Zoom <input type="range" id="bg-scale" min="50" max="300" value="100"></label>
+            </div>
+            <button id="bg-clear-btn" class="btn-danger" style="font-size:11px;padding:3px 8px;width:100%;margin-top:4px">Clear Background</button>
+          </div>
+        </div>
+
+        <!-- Combatant cards -->
+        <div class="combatants-list" id="combatants-list">
+          <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">
+            Add combatants above to begin.
+          </div>
+        </div>
+      </aside>
+
+      <!-- Right: Spotlight -->
+      <main class="spotlight-panel" id="spotlight-panel">
+        <div class="spotlight-empty">Add combatants and begin your encounter.</div>
+      </main>
+    </div>
+
+    <!-- Footer: turn controls -->
+    <footer class="combat-footer">
+      <span class="round-display" id="round-display">Round 1</span>
+      <button id="prev-btn">← Prev</button>
+      <button id="next-btn" class="btn-primary">Next Turn →</button>
+      <button id="reset-btn" class="btn-danger">↺ Reset</button>
+    </footer>
+  </div>
+
+  <!-- Condition banner -->
+  <div id="condition-banner" class="hidden"></div>
+
+  <!-- Condition picker dialog -->
+  <dialog id="condition-dialog">
+    <div class="dialog-header">
+      <h2>Conditions: <span id="cond-dialog-name">—</span></h2>
+      <button class="dialog-close" id="cond-dialog-close">✕</button>
+    </div>
+    <div class="conditions-grid" id="conditions-grid"></div>
+    <div id="rounds-form" class="rounds-form hidden">
+      <h4>How long does <span id="rounds-cond-name">this condition</span> last?</h4>
+      <div class="rounds-quick">
+        <button type="button" data-rounds="1">1 Round</button>
+        <button type="button" data-rounds="2">2 Rounds</button>
+        <button type="button" data-rounds="3">3 Rounds</button>
+        <button type="button" data-rounds="5">5 Rounds</button>
+        <button type="button" data-rounds="10">10 Rounds</button>
+        <button type="button" data-rounds="">Indefinite</button>
+      </div>
+      <div class="rounds-custom">
+        Custom:
+        <input type="number" id="rounds-custom-input" placeholder="# rounds" min="1" style="width:80px">
+        <button type="button" id="rounds-custom-apply">Apply</button>
+      </div>
+    </div>
+    <div id="exhaustion-picker" class="hidden" style="margin-top:12px">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px">Select exhaustion level (click current level to remove):</p>
+      <div class="exhaustion-picker">
+        <button class="exhaust-level-btn" data-level="1">1</button>
+        <button class="exhaust-level-btn" data-level="2">2</button>
+        <button class="exhaust-level-btn" data-level="3">3</button>
+        <button class="exhaust-level-btn" data-level="4">4</button>
+        <button class="exhaust-level-btn" data-level="5">5</button>
+        <button class="exhaust-level-btn" data-level="6">6</button>
+        <button type="button" id="exhaust-remove" class="btn-danger" style="font-size:12px;padding:4px 10px">Remove</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="/js/combat.js"></script>
+</body>
+</html>

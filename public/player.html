@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Initiative – D&D Initiative Tracker</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="player-page">
+
+    <header class="player-header">
+      <h1>⚔️ <span id="room-name">Connecting…</span></h1>
+      <span class="player-round" id="round-display">Round 1</span>
+    </header>
+
+    <div class="player-body">
+      <!-- Crossfade layer A -->
+      <div id="spotlight-a" class="spotlight-layer"></div>
+      <!-- Crossfade layer B -->
+      <div id="spotlight-b" class="spotlight-layer"></div>
+
+      <!-- Initiative overlay panel (right) -->
+      <aside class="player-initiative" id="player-initiative">
+        <div class="initiative-panel-label">Initiative Order</div>
+        <div id="player-combatants-list">
+          <div class="connecting-msg">Waiting…</div>
+        </div>
+      </aside>
+    </div>
+
+  </div>
+  <script src="/js/player.js"></script>
+</body>
+</html>
