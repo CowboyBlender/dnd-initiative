@@ -1468,8 +1468,8 @@ dialog#condition-dialog::backdrop {
     height: auto;
   }
 
-  /* Spotlight panel: tighter image, full width */
-  .spotlight-panel { padding: 12px; }
+  /* Spotlight panel: full width, natural height, no internal scroll (page scrolls) */
+  .spotlight-panel { padding: 12px; flex: none; overflow: visible; }
   .spotlight-card { max-width: 100%; }
   .spotlight-image-wrap { height: 160px; }
   .spotlight-notes { max-width: 100%; }
