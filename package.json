@@ -4,16 +4,17 @@
   "description": "D&D initiative tracker with real-time player views",
   "main": "server.js",
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node --disable-warning=ExperimentalWarning server.js",
-    "dev": "node --disable-warning=ExperimentalWarning --watch server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "express": "^4.18.2",
     "express-session": "^1.17.3",
+    "pg": "^8.11.3",
     "uuid": "^9.0.0",
     "ws": "^8.16.0"
   }
