@@ -6,6 +6,8 @@ const { WebSocketServer } = require('ws');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 // ─── Database Setup ───────────────────────────────────────────────────────────
@@ -75,6 +77,17 @@ async function initDb() {
   await pool.query('ALTER TABLE combatants ADD COLUMN IF NOT EXISTS death_save_fails INTEGER DEFAULT 0');
   await pool.query('ALTER TABLE combatants ADD COLUMN IF NOT EXISTS death_save_successes INTEGER DEFAULT 0');
   await pool.query('ALTER TABLE combatants ADD COLUMN IF NOT EXISTS show_death_saves BOOLEAN DEFAULT TRUE');
+
+  // Session store table (connect-pg-simple schema)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      sid  VARCHAR   NOT NULL COLLATE "default",
+      sess JSON      NOT NULL,
+      expire TIMESTAMP(6) NOT NULL,
+      CONSTRAINT session_pkey PRIMARY KEY (sid) NOT DEFERRABLE INITIALLY IMMEDIATE
+    );
+    CREATE INDEX IF NOT EXISTS idx_session_expire ON user_sessions (expire);
+  `);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -200,10 +213,30 @@ app.set('trust proxy', 1);
 const isProd = process.env.NODE_ENV === 'production';
 
 const sessionParser = session({
+  store: new pgSession({
+    pool,
+    tableName: 'user_sessions',
+  }),
   secret: process.env.SESSION_SECRET || ('dnd-tracker-' + Math.random().toString(36)),
   resave: false,
   saveUninitialized: false,
   cookie: { secure: isProd, httpOnly: true, sameSite: 'lax' },
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts, please try again later.' },
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many accounts created from this IP, please try again later.' },
 });
 
 app.use(express.json());
@@ -216,7 +249,7 @@ function requireAuth(req, res, next) {
 }
 
 // ─── Auth Routes ──────────────────────────────────────────────────────────────
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', registerLimiter, async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
   if (username.length < 2 || username.length > 20) return res.status(400).json({ error: 'Username must be 2–20 characters' });
@@ -239,7 +272,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', loginLimiter, async (req, res) => {
   const { username, password, rememberMe } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
 
