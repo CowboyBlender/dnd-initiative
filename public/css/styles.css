@@ -560,6 +560,11 @@ input[type="number"] { width: auto; }
   flex-shrink: 0;
 }
 .card-delete:hover { color: var(--red); background: rgba(192,57,43,0.15); }
+.clone-btn {
+  background: transparent; border: none; color: var(--text-muted);
+  font-size: 14px; padding: 2px 4px; cursor: pointer; opacity: 0.6;
+}
+.clone-btn:hover { opacity: 1; color: var(--gold); }
 
 .card-color-picker {
   width: 22px;
@@ -591,6 +596,13 @@ input[type="number"] { width: auto; }
   font-size: 12px;
 }
 .hp-sep { color: var(--text-muted); }
+.hp-adjust-row { display: flex; align-items: center; gap: 4px; margin-top: 5px; width: 100%; }
+.hp-adjust-input { width: 48px; text-align: center; padding: 3px 4px; font-size: 12px; }
+.hp-adjust-btn { padding: 2px 8px; font-size: 13px; font-weight: 700; border-radius: 4px; min-width: 28px; }
+.heal-btn { background: rgba(39,174,96,0.25); border-color: var(--green); color: var(--green); }
+.heal-btn:hover { background: rgba(39,174,96,0.45); }
+.dmg-btn  { background: rgba(192,57,43,0.25); border-color: var(--red); color: var(--red); }
+.dmg-btn:hover  { background: rgba(192,57,43,0.45); }
 
 /* Conditions section in card */
 .card-conditions-row {
@@ -613,6 +625,11 @@ input[type="number"] { width: auto; }
 }
 .condition-badge:hover { background: rgba(192,57,43,0.3); border-color: var(--red); }
 .condition-badge.exhaust { border-color: #8b5e3c; background: rgba(139,94,60,0.3); }
+@keyframes expiring-pulse {
+  0%, 100% { border-color: #e67e22; box-shadow: 0 0 0 0 rgba(230,126,34,0); }
+  50%       { border-color: #f39c12; box-shadow: 0 0 6px 2px rgba(230,126,34,0.4); }
+}
+.condition-badge.expiring { border-color: #e67e22; color: #f39c12; animation: expiring-pulse 1.4s ease-in-out infinite; }
 
 .add-cond-btn {
   font-size: 11px;
@@ -842,6 +859,7 @@ input[type="number"] { width: auto; }
   font-size: 14px;
 }
 .spotlight-cond-badge.exhaust { border-color: #8b5e3c; background: rgba(139,94,60,0.3); }
+.spotlight-cond-badge.expiring { border-color: #e67e22; color: #f39c12; animation: expiring-pulse 1.4s ease-in-out infinite; }
 
 /* Spotlight notes – editable textarea */
 .spotlight-notes {

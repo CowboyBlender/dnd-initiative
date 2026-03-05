@@ -244,7 +244,7 @@ function buildCombatantCard(c, isActive) {
   // Conditions
   const condBadges = c.conditions.map(cond => {
     const label = formatConditionLabel(cond);
-    return `<span class="condition-badge${cond.condition_name === 'Exhaustion' ? ' exhaust' : ''}"
+    return `<span class="condition-badge${cond.condition_name === 'Exhaustion' ? ' exhaust' : ''}${cond.rounds_remaining === 1 ? ' expiring' : ''}"
                   data-cond="${esc(cond.condition_name)}" title="Click to remove">${esc(label)}</span>`;
   }).join('');
 
@@ -261,6 +261,7 @@ function buildCombatantCard(c, isActive) {
         </div>
       </div>
       <input type="color" class="card-color-picker" value="${esc(c.card_color || '#2a2a40')}" title="Card color">
+      <button class="clone-btn" title="Clone combatant">⧉</button>
       <button class="card-delete btn-icon" title="Delete">×</button>
     </div>
 
@@ -272,6 +273,11 @@ function buildCombatantCard(c, isActive) {
       <input class="hp-input" type="number" name="max_hp" value="${c.max_hp}" min="1">
       <label style="margin-left:6px">Tmp</label>
       <input class="hp-input" type="number" name="temp_hp" value="${c.temp_hp}" min="0">
+    </div>
+    <div class="hp-adjust-row">
+      <input class="hp-adjust-input" type="number" min="1" placeholder="Amt" title="Amount to heal or damage">
+      <button class="hp-adjust-btn heal-btn" title="Heal">+</button>
+      <button class="hp-adjust-btn dmg-btn" title="Damage">−</button>
     </div>` : ''}
 
     <div class="card-conditions-row">
@@ -386,6 +392,30 @@ function buildCombatantCard(c, isActive) {
     });
     // Prevent clicks inside inputs from triggering drag
     input.addEventListener('mousedown', e => e.stopPropagation());
+  });
+
+  // HP quick adjust
+  const adjustInput = card.querySelector('.hp-adjust-input');
+  const healBtn     = card.querySelector('.heal-btn');
+  const dmgBtn      = card.querySelector('.dmg-btn');
+  if (adjustInput && healBtn && dmgBtn) {
+    const applyAdjust = (sign) => {
+      const amt = parseInt(adjustInput.value);
+      if (!amt || amt <= 0) return;
+      const newHp = Math.max(0, Math.min(c.max_hp, c.current_hp + sign * amt));
+      send({ type: 'update_hp', data: { id: c.id, current_hp: newHp, max_hp: c.max_hp, temp_hp: c.temp_hp } });
+      adjustInput.value = '';
+    };
+    healBtn.addEventListener('click', () => applyAdjust(+1));
+    dmgBtn.addEventListener('click',  () => applyAdjust(-1));
+    adjustInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyAdjust(-1); });
+    adjustInput.addEventListener('mousedown', e => e.stopPropagation());
+  }
+
+  // Clone combatant
+  card.querySelector('.clone-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    send({ type: 'clone_combatant', data: { id: c.id } });
   });
 
   // Condition remove on badge click

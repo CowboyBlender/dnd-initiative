@@ -163,7 +163,7 @@ function buildInitiativeCard(c, isActive) {
 
   const condHtml = (c.show_conditions && c.conditions.length)
     ? `<div class="player-card-conds">${c.conditions.map(cd =>
-        `<span class="condition-badge" style="font-size:10px;padding:1px 5px">${esc(formatCondLabel(cd))}</span>`
+        `<span class="condition-badge${cd.rounds_remaining === 1 ? ' expiring' : ''}" style="font-size:10px;padding:1px 5px">${esc(formatCondLabel(cd))}</span>`
       ).join('')}</div>`
     : '';
 
@@ -253,7 +253,7 @@ function buildSpotlightHtml(cur, next) {
 function buildOverlayContent(cur, next) {
   const condHtml = (cur.show_conditions && cur.conditions.length)
     ? cur.conditions.map(cd =>
-        `<span class="spotlight-cond-badge${cd.condition_name === 'Exhaustion' ? ' exhaust' : ''}">${esc(formatCondLabel(cd))}</span>`
+        `<span class="spotlight-cond-badge${cd.condition_name === 'Exhaustion' ? ' exhaust' : ''}${cd.rounds_remaining === 1 ? ' expiring' : ''}">${esc(formatCondLabel(cd))}</span>`
       ).join('')
     : '';
 

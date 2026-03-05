@@ -8,6 +8,7 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
 const path = require('path');
 
 // ─── Database Setup ───────────────────────────────────────────────────────────
@@ -211,6 +212,7 @@ const httpServer = createServer(app);
 app.set('trust proxy', 1);
 
 const isProd = process.env.NODE_ENV === 'production';
+app.use(morgan(isProd ? 'combined' : 'dev'));
 
 const sessionParser = session({
   store: new pgSession({
@@ -360,8 +362,21 @@ app.get('/api/rooms/:code/state', async (req, res) => {
   }
 });
 
+// ─── Health Check ─────────────────────────────────────────────────────────────
+app.get('/health', (_req, res) => res.json({ ok: true, uptime: Math.floor(process.uptime()) }));
+
 // ─── WebSocket Server ─────────────────────────────────────────────────────────
 const wss = new WebSocketServer({ noServer: true });
+
+// Heartbeat: ping every 20s, terminate silently dropped connections
+const heartbeat = setInterval(() => {
+  wss.clients.forEach(ws => {
+    if (!ws.isAlive) { ws.terminate(); return; }
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 20_000);
+wss.on('close', () => clearInterval(heartbeat));
 
 httpServer.on('upgrade', (req, socket, head) => {
   sessionParser(req, {}, () => {
@@ -389,6 +404,8 @@ wss.on('connection', async (ws, req) => {
   }
 
   ws.roomCode = roomCode;
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
 
   // Send initial state
   const state = await buildRoomState(room, ws.isDM ? 'dm' : 'player');
@@ -527,6 +544,45 @@ wss.on('connection', async (ws, req) => {
         const { rows: crow } = await pool.query('SELECT room_id FROM combatants WHERE id=$1', [id]);
         if (!crow[0] || crow[0].room_id !== r.id) return;
         await pool.query('UPDATE combatants SET name=$1 WHERE id=$2', [name.trim().substring(0, 100), id]);
+        await broadcastRoom(roomCode, wss);
+        return;
+      }
+
+      // ── clone_combatant ───────────────────────────────────────────────────
+      if (type === 'clone_combatant') {
+        const { id } = data;
+        const { rows: crow } = await pool.query('SELECT * FROM combatants WHERE id=$1', [id]);
+        if (!crow[0] || crow[0].room_id !== r.id) return;
+        const src = crow[0];
+
+        const { rows: maxRows } = await pool.query(
+          'SELECT MAX(sort_order) as m FROM combatants WHERE room_id=$1', [r.id]
+        );
+        const nextOrder = (maxRows[0].m != null) ? maxRows[0].m + 1 : 0;
+
+        await pool.query(`
+          INSERT INTO combatants
+            (room_id, name, combatant_type, initiative, sort_order,
+             max_hp, current_hp, temp_hp, image_url, card_color,
+             image_x, image_y, image_scale, is_visible, layer_action,
+             show_name, show_hp, show_conditions, show_death_saves)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+          [
+            r.id, (src.name + ' (Copy)').substring(0, 100), src.combatant_type,
+            src.initiative, nextOrder,
+            src.max_hp, src.max_hp, 0, src.image_url, src.card_color,
+            src.image_x, src.image_y, src.image_scale, src.is_visible, src.layer_action,
+            src.show_name, src.show_hp, src.show_conditions, src.show_death_saves,
+          ]
+        );
+
+        const { rows: all } = await pool.query(
+          'SELECT id FROM combatants WHERE room_id=$1 ORDER BY initiative DESC, id', [r.id]
+        );
+        await Promise.all(all.map((c, i) =>
+          pool.query('UPDATE combatants SET sort_order=$1 WHERE id=$2', [i, c.id])
+        ));
+
         await broadcastRoom(roomCode, wss);
         return;
       }
@@ -743,7 +799,16 @@ const PORT = process.env.PORT || 3000;
 initDb()
   .then(() => {
     httpServer.listen(PORT, () => {
-      console.log(`\u{1F3B2} D&D Initiative Tracker → http://localhost:${PORT}`);
+      console.log(`🎲 Soju Turn Tracker listening on port ${PORT}`);
+    });
+
+    process.on('SIGTERM', () => {
+      console.log('SIGTERM received — shutting down gracefully');
+      wss.clients.forEach(client => client.close(1001, 'Server shutting down'));
+      httpServer.close(() => {
+        pool.end(() => process.exit(0));
+      });
+      setTimeout(() => process.exit(1), 10_000).unref();
     });
   })
   .catch(err => {
