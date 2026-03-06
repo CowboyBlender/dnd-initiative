@@ -577,7 +577,6 @@ input[type="number"] { width: auto; }
   border-bottom: 1px solid transparent;
   width: 22px;
   min-width: 0;
-  flex-shrink: 0;
   text-align: center;
   font-family: var(--font-ui);
   padding: 0;
