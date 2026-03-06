@@ -264,7 +264,7 @@ function buildCombatantCard(c, isActive) {
         <div class="card-sub">
           <span>${esc(c.combatant_type)}</span>
           <span class="card-sub-label">Init:</span><input class="card-initiative-input" type="number" value="${c.initiative}" title="Click to edit initiative">
-          ${isActive ? '<span style="color:var(--gold);font-weight:700">▶ Active</span>' : ''}
+          ${isActive ? '<span style="color:var(--gold);font-weight:700;margin-left:auto;white-space:nowrap">▶ Active</span>' : ''}
         </div>
       </div>
       <input type="color" class="card-color-picker" value="${esc(c.card_color || '#2a2a40')}" title="Card color">
