@@ -155,6 +155,22 @@
     </div>
   </dialog>
 
+  <!-- Bulk context menu (appears on right-click when cards are selected) -->
+  <div id="bulk-context-menu" class="hidden">
+    <div class="menu-header" id="bulk-menu-label">2 selected</div>
+    <button id="bulk-cond-btn">Apply Condition…</button>
+    <button id="bulk-dmg-btn">Apply Damage…</button>
+    <button id="bulk-heal-btn">Apply Heal…</button>
+  </div>
+
+  <!-- Bulk HP amount popup -->
+  <div id="bulk-amount-popup" class="hidden">
+    <span id="bulk-amount-label">Damage amount</span>
+    <input type="number" id="bulk-amount-input" min="1" placeholder="Amount">
+    <button id="bulk-amount-apply" class="btn-primary">Apply</button>
+    <button id="bulk-amount-cancel">✕</button>
+  </div>
+
   <script src="/js/combat.js"></script>
 </body>
 </html>

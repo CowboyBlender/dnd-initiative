@@ -566,7 +566,27 @@ input[type="number"] { width: auto; }
   color: var(--text-muted);
   display: flex;
   gap: 8px;
+  align-items: center;
 }
+.card-sub-label { color: var(--text-muted); }
+.card-initiative-input {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  width: 32px;
+  text-align: center;
+  font-family: var(--font-ui);
+  padding: 0;
+  outline: none;
+  cursor: text;
+  -moz-appearance: textfield;
+}
+.card-initiative-input::-webkit-outer-spin-button,
+.card-initiative-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.card-initiative-input:hover { border-bottom-color: var(--border); }
+.card-initiative-input:focus { border-bottom-color: var(--gold-dim); color: var(--text); }
 .card-delete {
   padding: 2px 6px;
   font-size: 14px;
@@ -1072,6 +1092,76 @@ dialog#condition-dialog::backdrop {
 }
 .cond-pick-btn.exhaust-btn { border-color: #8b5e3c; }
 .cond-pick-btn.exhaust-btn.active { background: rgba(139,94,60,0.25); color: #c89060; border-color: #c89060; }
+
+/* Custom condition input row */
+.custom-cond-row {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.custom-cond-input { flex: 1; font-size: 12px; padding: 4px 8px; }
+.custom-cond-add-btn { font-size: 12px; padding: 4px 10px; }
+
+/* ── Bulk card selection ─────────────────────────────────────────────────── */
+.combatant-card.selected {
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 2px rgba(74,158,255,0.25);
+}
+
+/* ── Bulk context menu ───────────────────────────────────────────────────── */
+#bulk-context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 0;
+  min-width: 180px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+}
+#bulk-context-menu .menu-header {
+  padding: 6px 14px 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+#bulk-context-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 14px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+#bulk-context-menu button:hover { background: rgba(255,255,255,0.06); }
+
+/* ── Bulk amount popup ───────────────────────────────────────────────────── */
+#bulk-amount-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+#bulk-amount-input { width: 70px; text-align: center; padding: 4px 6px; font-size: 13px; }
 
 .exhaustion-picker {
   display: flex;

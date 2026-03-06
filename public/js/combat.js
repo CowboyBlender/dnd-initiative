@@ -2,7 +2,7 @@
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const CONDITIONS = [
-  'Blinded', 'Charmed', 'Concentrating', 'Dead', 'Deafened', 'Exhaustion', 'Frightened',
+  'Bless', 'Blinded', 'Charmed', 'Concentrating', 'Dead', 'Deafened', 'Exhaustion', 'Frightened',
   'Grappled', 'Incapacitated', 'Invisible', 'Paralyzed', 'Petrified',
   'Poisoned', 'Prone', 'Restrained', 'Stunned', 'Unconscious',
 ];
@@ -17,6 +17,9 @@ const expandedCropIds        = new Set(); // preserve open state of crop section
 const expandedLayerActionIds = new Set(); // preserve open state of layer action sections
 const layerActionNotes       = new Map(); // preserve textarea content by combatant id
 let bgFormInitialized = false;
+let selectedCardIds   = new Set(); // ctrl-clicked combatant IDs for bulk operations
+let bulkActionSign    = 0;         // +1 = heal, -1 = damage
+let bulkConditionMode = false;     // true when condition dialog opened for bulk apply
 
 // ── Init ───────────────────────────────────────────────────────────────────────
 (async () => {
@@ -110,6 +113,9 @@ function setupUI(roomCode) {
 
   // Background image form
   setupBgForm();
+
+  // Bulk operations
+  setupBulkOperations();
 }
 
 // ── Render All ─────────────────────────────────────────────────────────────────
@@ -221,6 +227,7 @@ function buildCombatantCard(c, isActive) {
   const card = document.createElement('div');
   card.className = 'combatant-card' + (isActive ? ' active-turn' : '');
   card.dataset.id = c.id;
+  if (selectedCardIds.has(c.id)) card.classList.add('selected');
   card.draggable = true;
   card.style.backgroundColor = c.card_color || '#2a2a40';
 
@@ -256,7 +263,7 @@ function buildCombatantCard(c, isActive) {
         <input class="card-name-input" type="text" value="${esc(c.name)}" maxlength="100">
         <div class="card-sub">
           <span>${esc(c.combatant_type)}</span>
-          <span>Init: ${c.initiative}</span>
+          <span class="card-sub-label">Init:</span><input class="card-initiative-input" type="number" value="${c.initiative}" title="Click to edit initiative">
           ${isActive ? '<span style="color:var(--gold);font-weight:700">▶ Active</span>' : ''}
         </div>
       </div>
@@ -343,6 +350,30 @@ function buildCombatantCard(c, isActive) {
     if (confirm(`Delete "${c.name}"?`)) send({ type: 'delete_combatant', data: { id: c.id } });
   });
 
+  // Ctrl+click to multi-select
+  card.addEventListener('click', e => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    if (selectedCardIds.has(c.id)) {
+      selectedCardIds.delete(c.id);
+      card.classList.remove('selected');
+    } else {
+      selectedCardIds.add(c.id);
+      card.classList.add('selected');
+    }
+  });
+
+  // Right-click opens bulk context menu when cards are selected
+  card.addEventListener('contextmenu', e => {
+    if (selectedCardIds.size === 0) return;
+    e.preventDefault();
+    if (!selectedCardIds.has(c.id)) {
+      selectedCardIds.add(c.id);
+      card.classList.add('selected');
+    }
+    showBulkContextMenu(e.clientX, e.clientY);
+  });
+
   // Card color picker – update background live, persist on change
   const colorPicker = card.querySelector('.card-color-picker');
   const applyColorPickerOutline = col => {
@@ -374,6 +405,18 @@ function buildCombatantCard(c, isActive) {
     });
     nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') nameInput.blur(); });
     nameInput.addEventListener('mousedown', e => e.stopPropagation());
+  }
+
+  // Initiative input – commit on blur/Enter, triggers re-sort
+  const initInput = card.querySelector('.card-initiative-input');
+  if (initInput) {
+    initInput.addEventListener('change', () => {
+      const val = parseInt(initInput.value);
+      if (isNaN(val)) { initInput.value = c.initiative; return; }
+      send({ type: 'update_initiative', data: { id: c.id, initiative: val } });
+    });
+    initInput.addEventListener('keydown', e => { if (e.key === 'Enter') initInput.blur(); });
+    initInput.addEventListener('mousedown', e => e.stopPropagation());
   }
 
   // HP inputs (send on change = when field is blurred with a different value)
@@ -738,8 +781,8 @@ function renderSpotlight() {
 function setupConditionDialog() {
   const dialog = document.getElementById('condition-dialog');
 
-  document.getElementById('cond-dialog-close').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
+  document.getElementById('cond-dialog-close').addEventListener('click', () => { dialog.close(); bulkConditionMode = false; });
+  dialog.addEventListener('click', e => { if (e.target === dialog) { dialog.close(); bulkConditionMode = false; } });
 
   // Rounds quick buttons
   document.querySelectorAll('.rounds-quick button').forEach(btn => {
@@ -790,6 +833,9 @@ function renderConditionGrid(conditions) {
   grid.innerHTML = '';
 
   CONDITIONS.forEach(condName => {
+    // Exhaustion level picker isn't supported in bulk mode
+    if (bulkConditionMode && condName === 'Exhaustion') return;
+
     const existing = conditions.find(c => c.condition_name === condName);
     const btn = document.createElement('button');
     btn.className = 'cond-pick-btn' + (existing ? ' active' : '') + (condName === 'Exhaustion' ? ' exhaust-btn' : '');
@@ -815,6 +861,40 @@ function renderConditionGrid(conditions) {
 
     grid.appendChild(btn);
   });
+
+  // Custom (non-standard) conditions that are currently active
+  const customActive = conditions.filter(cd => !CONDITIONS.includes(cd.condition_name));
+  customActive.forEach(existing => {
+    const btn = document.createElement('button');
+    btn.className = 'cond-pick-btn active';
+    btn.textContent = existing.condition_name;
+    btn.addEventListener('click', () => {
+      if (confirm(`Remove ${existing.condition_name}?`)) {
+        send({ type: 'toggle_condition', data: { combatant_id: condDialogCombatantId, condition_name: existing.condition_name } });
+        document.getElementById('rounds-form').classList.add('hidden');
+      }
+    });
+    grid.appendChild(btn);
+  });
+
+  // Custom condition input row
+  const customRow = document.createElement('div');
+  customRow.className = 'custom-cond-row';
+  customRow.innerHTML = `
+    <input class="custom-cond-input" type="text" maxlength="40" placeholder="Custom condition…">
+    <button class="custom-cond-add-btn">Add</button>`;
+  grid.appendChild(customRow);
+
+  const customInput  = customRow.querySelector('.custom-cond-input');
+  const customAddBtn = customRow.querySelector('.custom-cond-add-btn');
+  const applyCustom  = () => {
+    const name = customInput.value.trim();
+    if (!name) return;
+    showRoundsForm(name);
+    customInput.value = '';
+  };
+  customAddBtn.addEventListener('click', applyCustom);
+  customInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyCustom(); });
 }
 
 function showRoundsForm(condName) {
@@ -827,16 +907,21 @@ function showRoundsForm(condName) {
 
 function applyConditionWithRounds(rounds) {
   if (!condDialogPendingCondition) return;
-  send({
-    type: 'toggle_condition',
-    data: {
-      combatant_id:   condDialogCombatantId,
-      condition_name: condDialogPendingCondition,
-      rounds:         rounds,
-    },
-  });
+  if (bulkConditionMode) {
+    applyBulkCondition(condDialogPendingCondition, rounds);
+  } else {
+    send({
+      type: 'toggle_condition',
+      data: {
+        combatant_id:   condDialogCombatantId,
+        condition_name: condDialogPendingCondition,
+        rounds:         rounds,
+      },
+    });
+  }
   document.getElementById('rounds-form').classList.add('hidden');
   condDialogPendingCondition = null;
+  bulkConditionMode = false;
 }
 
 function showExhaustionPicker(currentLevel) {
@@ -879,4 +964,109 @@ function formatConditionLabel(cond) {
     return `${cond.condition_name}: ${r} ${r === 1 ? 'Round' : 'Rounds'} Remaining`;
   }
   return cond.condition_name;
+}
+
+// ── Bulk Operations ────────────────────────────────────────────────────────────
+function setupBulkOperations() {
+  document.getElementById('bulk-cond-btn').addEventListener('click', () => {
+    hideBulkContextMenu();
+    openConditionDialogBulk();
+  });
+  document.getElementById('bulk-dmg-btn').addEventListener('click', () => {
+    hideBulkContextMenu();
+    showBulkAmountPopup(-1, 'Damage amount');
+  });
+  document.getElementById('bulk-heal-btn').addEventListener('click', () => {
+    hideBulkContextMenu();
+    showBulkAmountPopup(+1, 'Heal amount');
+  });
+
+  const applyBulkAmount = () => {
+    const amt = parseInt(document.getElementById('bulk-amount-input').value);
+    document.getElementById('bulk-amount-popup').classList.add('hidden');
+    applyBulkHP(bulkActionSign, amt);
+  };
+  document.getElementById('bulk-amount-apply').addEventListener('click', applyBulkAmount);
+  document.getElementById('bulk-amount-cancel').addEventListener('click', () => {
+    document.getElementById('bulk-amount-popup').classList.add('hidden');
+  });
+  document.getElementById('bulk-amount-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') applyBulkAmount();
+  });
+
+  // Dismiss context menu on outside click
+  document.addEventListener('click', e => {
+    const menu = document.getElementById('bulk-context-menu');
+    if (!menu.classList.contains('hidden') && !menu.contains(e.target)) hideBulkContextMenu();
+  });
+
+  // Escape clears selection and closes bulk UI
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      hideBulkContextMenu();
+      document.getElementById('bulk-amount-popup').classList.add('hidden');
+      clearSelection();
+    }
+  });
+}
+
+function showBulkContextMenu(x, y) {
+  const menu = document.getElementById('bulk-context-menu');
+  document.getElementById('bulk-menu-label').textContent =
+    `${selectedCardIds.size} combatant${selectedCardIds.size > 1 ? 's' : ''} selected`;
+  menu.classList.remove('hidden');
+  const vw = window.innerWidth, vh = window.innerHeight;
+  menu.style.left = Math.min(x, vw - 200) + 'px';
+  menu.style.top  = Math.min(y, vh - 130) + 'px';
+}
+
+function hideBulkContextMenu() {
+  document.getElementById('bulk-context-menu').classList.add('hidden');
+}
+
+function clearSelection() {
+  selectedCardIds.clear();
+  document.querySelectorAll('.combatant-card.selected').forEach(el => el.classList.remove('selected'));
+}
+
+function applyBulkHP(sign, amount) {
+  if (!amount || amount <= 0) return;
+  selectedCardIds.forEach(id => {
+    const cb = state && state.combatants.find(c => c.id === id);
+    if (!cb) return;
+    const newHp = Math.max(0, Math.min(cb.max_hp, cb.current_hp + sign * amount));
+    send({ type: 'update_hp', data: { id, current_hp: newHp, max_hp: cb.max_hp, temp_hp: cb.temp_hp } });
+  });
+  clearSelection();
+}
+
+function applyBulkCondition(condName, rounds) {
+  selectedCardIds.forEach(id => {
+    const cb = state && state.combatants.find(c => c.id === id);
+    if (!cb) return;
+    // Only add — never toggle off in bulk mode
+    if (cb.conditions.some(cd => cd.condition_name === condName)) return;
+    send({ type: 'toggle_condition', data: { combatant_id: id, condition_name: condName, rounds } });
+  });
+  clearSelection();
+}
+
+function openConditionDialogBulk() {
+  bulkConditionMode = true;
+  condDialogPendingCondition = null;
+  document.getElementById('cond-dialog-name').textContent =
+    `${selectedCardIds.size} combatant${selectedCardIds.size > 1 ? 's' : ''}`;
+  document.getElementById('rounds-form').classList.add('hidden');
+  document.getElementById('exhaustion-picker').classList.add('hidden');
+  renderConditionGrid([]);
+  document.getElementById('condition-dialog').showModal();
+}
+
+function showBulkAmountPopup(sign, label) {
+  bulkActionSign = sign;
+  document.getElementById('bulk-amount-label').textContent = label;
+  const input = document.getElementById('bulk-amount-input');
+  input.value = '';
+  document.getElementById('bulk-amount-popup').classList.remove('hidden');
+  input.focus();
 }

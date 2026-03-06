@@ -548,6 +548,20 @@ wss.on('connection', async (ws, req) => {
         return;
       }
 
+      // ── update_initiative ─────────────────────────────────────────────────
+      if (type === 'update_initiative') {
+        const { id, initiative } = data;
+        const { rows: crow } = await pool.query('SELECT room_id FROM combatants WHERE id=$1', [id]);
+        if (!crow[0] || crow[0].room_id !== r.id) return;
+        await pool.query('UPDATE combatants SET initiative=$1 WHERE id=$2', [parseInt(initiative) || 0, id]);
+        const { rows: all } = await pool.query(
+          'SELECT id FROM combatants WHERE room_id=$1 ORDER BY initiative DESC, id', [r.id]
+        );
+        await Promise.all(all.map((c, i) => pool.query('UPDATE combatants SET sort_order=$1 WHERE id=$2', [i, c.id])));
+        await broadcastRoom(roomCode, wss);
+        return;
+      }
+
       // ── clone_combatant ───────────────────────────────────────────────────
       if (type === 'clone_combatant') {
         const { id } = data;
@@ -627,7 +641,7 @@ wss.on('connection', async (ws, req) => {
       // ── toggle_condition ───────────────────────────────────────────────────
       if (type === 'toggle_condition') {
         const { combatant_id, condition_name, exhaustion_level, rounds } = data;
-        const { rows: crow } = await pool.query('SELECT room_id FROM combatants WHERE id=$1', [combatant_id]);
+        const { rows: crow } = await pool.query('SELECT room_id, name FROM combatants WHERE id=$1', [combatant_id]);
         if (!crow[0] || crow[0].room_id !== r.id) return;
 
         const { rows: existing } = await pool.query(
@@ -639,6 +653,11 @@ wss.on('connection', async (ws, req) => {
             'DELETE FROM combatant_conditions WHERE combatant_id=$1 AND condition_name=$2',
             [combatant_id, condition_name]
           );
+          // Fire same notification as natural expiry so clients show the animation
+          notifyRoom(roomCode, wss, {
+            type: 'condition_expired',
+            data: { combatantId: combatant_id, combatantName: crow[0].name, conditionName: condition_name },
+          });
         } else {
           await pool.query(
             'INSERT INTO combatant_conditions (combatant_id, condition_name, exhaustion_level, rounds_remaining) VALUES ($1,$2,$3,$4)',
