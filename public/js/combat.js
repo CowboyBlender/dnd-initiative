@@ -352,12 +352,21 @@ function buildCombatantCard(c, isActive) {
 
   // Ctrl+click to multi-select
   card.addEventListener('click', e => {
-    if (!(e.ctrlKey || e.metaKey)) return;
+    // Don't trigger selection when clicking interactive children
+    if (e.target.closest('button, input, select, a')) return;
     e.preventDefault();
-    if (selectedCardIds.has(c.id)) {
-      selectedCardIds.delete(c.id);
-      card.classList.remove('selected');
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl+click: toggle this card in multi-select
+      if (selectedCardIds.has(c.id)) {
+        selectedCardIds.delete(c.id);
+        card.classList.remove('selected');
+      } else {
+        selectedCardIds.add(c.id);
+        card.classList.add('selected');
+      }
     } else {
+      // Regular click: select only this card
+      clearSelection();
       selectedCardIds.add(c.id);
       card.classList.add('selected');
     }
@@ -994,10 +1003,18 @@ function setupBulkOperations() {
     if (e.key === 'Enter') applyBulkAmount();
   });
 
-  // Dismiss context menu on outside click
+  // Dismiss context menu and clear selection on outside click
   document.addEventListener('click', e => {
     const menu = document.getElementById('bulk-context-menu');
+    const popup = document.getElementById('bulk-amount-popup');
     if (!menu.classList.contains('hidden') && !menu.contains(e.target)) hideBulkContextMenu();
+    if (selectedCardIds.size > 0 &&
+        !e.target.closest('.combatant-card') &&
+        !e.target.closest('#bulk-context-menu') &&
+        !e.target.closest('#bulk-amount-popup') &&
+        !e.target.closest('dialog')) {
+      clearSelection();
+    }
   });
 
   // Escape clears selection and closes bulk UI
