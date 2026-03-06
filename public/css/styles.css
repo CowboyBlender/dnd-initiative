@@ -575,16 +575,13 @@ input[type="number"] { width: auto; }
   background: transparent;
   border: none;
   border-bottom: 1px solid transparent;
-  width: 2.5ch;
-  height: 1.2em;
-  line-height: 1;
+  width: 2ch;
   text-align: center;
   font-family: var(--font-ui);
   padding: 0;
   outline: none;
   cursor: text;
   -moz-appearance: textfield;
-  vertical-align: middle;
 }
 .card-initiative-input::-webkit-outer-spin-button,
 .card-initiative-input::-webkit-inner-spin-button { -webkit-appearance: none; }
