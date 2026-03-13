@@ -21,6 +21,17 @@ let selectedCardIds   = new Set(); // ctrl-clicked combatant IDs for bulk operat
 let bulkActionSign    = 0;         // +1 = heal, -1 = damage
 let bulkConditionMode = false;     // true when condition dialog opened for bulk apply
 
+// Konami / horse stampede
+const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown',
+                'ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a','Enter'];
+let konamiProgress        = 0;
+let horseStampedeActive   = false;
+let horseStampedeInterval = null;
+
+// Undo stack
+let undoStack             = [];    // max 50 entries
+let pendingAddUndoPrevIds = null;  // Set of IDs before last add_combatant send
+
 // ── Init ───────────────────────────────────────────────────────────────────────
 (async () => {
   const me = await fetch('/api/auth/me').then(r => r.json());
@@ -43,6 +54,15 @@ function connectWS(roomCode) {
     const msg = JSON.parse(e.data);
     if (msg.type === 'state_update') {
       state = msg.data;
+      // Detect newly added combatant for undo tracking
+      if (pendingAddUndoPrevIds !== null) {
+        const newCombatant = state.combatants.find(c => !pendingAddUndoPrevIds.has(c.id));
+        if (newCombatant) {
+          undoStack.push({ type: 'delete', id: newCombatant.id });
+          if (undoStack.length > 50) undoStack.shift();
+        }
+        pendingAddUndoPrevIds = null;
+      }
       renderAll();
     } else if (msg.type === 'condition_expired') {
       showBanner(`Condition removed: ${msg.data.conditionName} from ${msg.data.combatantName}`);
@@ -80,6 +100,7 @@ function setupUI(roomCode) {
   document.getElementById('add-combatant-form').addEventListener('submit', e => {
     e.preventDefault();
     const fd = new FormData(e.target);
+    pendingAddUndoPrevIds = new Set((state?.combatants || []).map(c => c.id));
     send({
       type: 'add_combatant',
       data: {
@@ -347,7 +368,21 @@ function buildCombatantCard(c, isActive) {
 
   // Delete
   card.querySelector('.card-delete').addEventListener('click', () => {
-    if (confirm(`Delete "${c.name}"?`)) send({ type: 'delete_combatant', data: { id: c.id } });
+    if (confirm(`Delete "${c.name}"?`)) {
+      const fresh = state?.combatants?.find(cb => cb.id === c.id);
+      if (fresh) {
+        undoStack.push({ type: 'readd', combatant: {
+          name: fresh.name, combatant_type: fresh.combatant_type,
+          initiative: fresh.initiative, max_hp: fresh.max_hp,
+          image_url: fresh.image_url, card_color: fresh.card_color,
+          image_x: fresh.image_x, image_y: fresh.image_y,
+          image_scale: fresh.image_scale, layer_action: fresh.layer_action,
+          is_visible: fresh.is_visible,
+        }});
+        if (undoStack.length > 50) undoStack.shift();
+      }
+      send({ type: 'delete_combatant', data: { id: c.id } });
+    }
   });
 
   // Ctrl+click to multi-select
@@ -432,6 +467,8 @@ function buildCombatantCard(c, isActive) {
   const hpInputs = card.querySelectorAll('.hp-input');
   hpInputs.forEach(input => {
     input.addEventListener('change', () => {
+      undoStack.push({ type: 'hp', id: c.id, current_hp: c.current_hp, max_hp: c.max_hp, temp_hp: c.temp_hp });
+      if (undoStack.length > 50) undoStack.shift();
       send({
         type: 'update_hp',
         data: {
@@ -454,6 +491,8 @@ function buildCombatantCard(c, isActive) {
     const applyAdjust = (sign) => {
       const amt = parseInt(adjustInput.value);
       if (!amt || amt <= 0) return;
+      undoStack.push({ type: 'hp', id: c.id, current_hp: c.current_hp, max_hp: c.max_hp, temp_hp: c.temp_hp });
+      if (undoStack.length > 50) undoStack.shift();
       const newHp = Math.max(0, Math.min(c.max_hp, c.current_hp + sign * amt));
       send({ type: 'update_hp', data: { id: c.id, current_hp: newHp, max_hp: c.max_hp, temp_hp: c.temp_hp } });
       adjustInput.value = '';
@@ -1025,6 +1064,32 @@ function setupBulkOperations() {
       clearSelection();
     }
   });
+
+  // Konami Code listener
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+      konamiProgress = 0;
+      return;
+    }
+    if (e.key === KONAMI[konamiProgress]) {
+      konamiProgress++;
+      if (konamiProgress === KONAMI.length) {
+        konamiProgress = 0;
+        startHorseStampede();
+      }
+    } else {
+      konamiProgress = e.key === KONAMI[0] ? 1 : 0;
+    }
+  });
+
+  // Ctrl+Z undo listener
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+      undoLastAction();
+    }
+  });
 }
 
 function showBulkContextMenu(x, y) {
@@ -1086,4 +1151,54 @@ function showBulkAmountPopup(sign, label) {
   input.value = '';
   document.getElementById('bulk-amount-popup').classList.remove('hidden');
   input.focus();
+}
+
+// ── Horse Stampede ─────────────────────────────────────────────────────────────
+function startHorseStampede() {
+  if (horseStampedeActive) return;
+  horseStampedeActive = true;
+  const beforeIds = new Set((state?.combatants || []).map(c => c.id));
+  undoStack.push({ type: 'stampede', beforeIds });
+  if (undoStack.length > 50) undoStack.shift();
+  let count = 0;
+  horseStampedeInterval = setInterval(() => {
+    send({
+      type: 'add_combatant',
+      data: {
+        name: 'Horse', combatant_type: 'Monster',
+        initiative: 30, max_hp: 15,
+        image_url: '', card_color: '#2a2a40',
+        image_x: 50, image_y: 50, image_scale: 100,
+        layer_action: '', is_visible: true,
+      },
+    });
+    count++;
+    if (count >= 24) {
+      clearInterval(horseStampedeInterval);
+      horseStampedeInterval = null;
+      horseStampedeActive = false;
+    }
+  }, 1000);
+}
+
+// ── Undo ───────────────────────────────────────────────────────────────────────
+function undoLastAction() {
+  if (undoStack.length === 0) return;
+  const entry = undoStack.pop();
+  if (entry.type === 'stampede') {
+    if (horseStampedeInterval) {
+      clearInterval(horseStampedeInterval);
+      horseStampedeInterval = null;
+      horseStampedeActive = false;
+    }
+    (state?.combatants || [])
+      .filter(c => !entry.beforeIds.has(c.id) && c.name === 'Horse')
+      .forEach(c => send({ type: 'delete_combatant', data: { id: c.id } }));
+  } else if (entry.type === 'delete') {
+    send({ type: 'delete_combatant', data: { id: entry.id } });
+  } else if (entry.type === 'readd') {
+    send({ type: 'add_combatant', data: entry.combatant });
+  } else if (entry.type === 'hp') {
+    send({ type: 'update_hp', data: { id: entry.id, current_hp: entry.current_hp, max_hp: entry.max_hp, temp_hp: entry.temp_hp } });
+  }
 }
